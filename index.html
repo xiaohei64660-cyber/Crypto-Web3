@@ -2,238 +2,104 @@ html
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Universal Web3 DApp (Sepolia)</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="UTF-8">
+  <title>Connect Wallet Demo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    :root { color-scheme: dark; }
-    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif; background:#0f111a; color:#fff; }
-    .wrap { max-width: 720px; margin: 0 auto; padding: 24px; }
-    .card { background:#1a1f2b; border-radius: 16px; padding: 16px; }
-    h1, h2 { margin: 0 0 12px 0; }
-    .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-    button { padding:10px 16px; border:0; border-radius:10px; background:#3b82f6; color:#fff; font-weight:600; cursor:pointer; }
-    button:disabled { background:#334155; cursor:not-allowed; }
-    input, select { padding:10px; border-radius:10px; border:1px solid #334155; background:#0f111a; color:#fff; }
-    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; word-break: break-all; }
-    .grid { display:grid; grid-template-columns: 1fr; gap: 16px; }
-    .hr { border-top:1px solid #334155; margin:16px 0; }
-    .small { font-size: 12px; color:#cbd5e1; }
-    a { color:#93c5fd; text-decoration: none; }
+    body { margin:0; height:100vh; display:flex; justify-content:center; align-items:center;
+           background:#0f111a; font-family:sans-serif; color:#fff; }
+    #connectBtn { font-size:24px; padding:20px 40px; border:none; border-radius:12px;
+                  background:#3b82f6; color:#fff; cursor:pointer; }
+    #modal { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7);
+             display:none; justify-content:center; align-items:center; }
+    .modal-content { background:#1a1f2b; padding:24px; border-radius:12px; text-align:center; }
+    .modal-content button { margin:10px; padding:12px 24px; font-size:18px; border:none;
+                            border-radius:10px; cursor:pointer; }
+    .connect { background:#22c55e; color:#fff; }
+    .cancel { background:#ef4444; color:#fff; }
+    .mono { font-family:monospace; }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <h1>Universal Web3 DApp</h1>
-    <p class="small">WalletConnect v2 + injected fallback (MetaMask/Trust Wallet) — targeting Sepolia Ether (chainId 11155111).</p>
+  <button id="connectBtn">Connect Wallet</button>
 
-    <div class="card grid">
-      <div class="row">
-        <button id="connectBtn">Connect Wallet</button>
-        <button id="disconnectBtn" disabled>Disconnect</button>
-      </div>
-
-      <div>
-        <div><strong>Address:</strong> <span id="addr" class="mono">-</span></div>
-        <div><strong>Chain:</strong> <span id="chain" class="mono">-</span></div>
-        <div><strong>Connector:</strong> <span id="connector" class="mono">-</span></div>
-      </div>
-
-      <div class="hr"></div>
-
-      <div class="row">
-        <input id="msgInput" placeholder="Message to sign" style="flex:1" />
-        <button id="signBtn" disabled>Sign message</button>
-      </div>
-      <div><strong>Signature:</strong> <span id="sig" class="mono">-</span></div>
-
-      <div class="hr"></div>
-
-      <div class="row">
-        <input id="toInput" placeholder="Recipient address (0x...)" style="flex:1" />
-        <input id="valInput" placeholder="Amount in ETH (e.g., 0.001)" style="width:160px" />
-        <button id="sendBtn" disabled>Send ETH</button>
-      </div>
-      <div><strong>Tx hash:</strong> <span id="txh" class="mono">-</span></div>
-
-      <div class="hr"></div>
-
-      <p class="small">
-        Notes:
-        - Use Sepolia test ETH via a faucet before sending.
-        - If opened inside a mobile wallet browser (Trust Wallet / MetaMask), injected provider will be used. In regular browsers, WalletConnect modal will appear.
-      </p>
+  <div id="modal">
+    <div class="modal-content">
+      <h2>Connect your wallet</h2>
+      <button class="connect" id="confirmConnect">Connect</button>
+      <button class="cancel" id="cancelConnect">Cancel</button>
+      <p><strong>Address:</strong> <span id="addr" class="mono">-</span></p>
     </div>
-
-    <p class="small">Tip: For hosting, you can use GitHub Pages or Vercel and open the URL inside a wallet DApp browser.</p>
   </div>
 
-  <!-- WalletConnect Web3Modal (UMD) -->
+  <!-- WalletConnect Modal UMD -->
   <script src="https://unpkg.com/@walletconnect/modal/dist/index.umd.js"></script>
-  <!-- Ethers v6 (UMD) -->
+  <!-- Ethers v6 UMD -->
   <script src="https://cdn.jsdelivr.net/npm/ethers@6.11.1/dist/ethers.umd.min.js"></script>
 
   <script>
-    // Configuration
-    const PROJECT_ID = "b8f109f1f1b42ea46db278b216df1daa"; // your WalletConnect Project ID
-    const SEPOLIACHAINID = 11155111;
-    const SEPOLIANAMESPACE = "eip155:" + SEPOLIACHAIN_ID;
+    const PROJECT_ID = "b8f109f1f1b42ea46db278b216df1daa";
+    const SEPOLIA = "eip155:11155111";
 
-    // UI elements
-    const connectBtn = document.getElementById("connectBtn");
-    const disconnectBtn = document.getElementById("disconnectBtn");
-    const signBtn = document.getElementById("signBtn");
-    const sendBtn = document.getElementById("sendBtn");
-    const addrEl = document.getElementById("addr");
-    const chainEl = document.getElementById("chain");
-    const connectorEl = document.getElementById("connector");
-    const msgInput = document.getElementById("msgInput");
-    const sigEl = document.getElementById("sig");
-    const toInput = document.getElementById("toInput");
-    const valInput = document.getElementById("valInput");
-    const txhEl = document.getElementById("txh");
-
-    // Runtime state
-    let ctx = null; // { type, provider, signer, session? }
-
-    // Create WalletConnect modal (targets Sepolia)
     const wcModal = new window.WalletConnectModal.WalletConnectModal({
       projectId: PROJECT_ID,
-      chains: [SEPOLIA_NAMESPACE],
+      chains: [SEPOLIA],
       themeMode: "dark",
       metadata: {
-        name: "Universal Web3 DApp",
-        description: "WalletConnect v2 + injected fallback (Sepolia)",
-        url: "https://your-domain.example",
+        name: "Connect Wallet Demo",
+        description: "Simple landing page demo",
+        url: "https://example.com",
         icons: ["https://assets.trustwallet.com/blockchains/ethereum/info/logo.png"]
       }
     });
 
-    // Connect flow: try injected first, fallback to WalletConnect
-    async function connectUniversal() {
-      // 1) Injected provider (MetaMask/Trust Wallet mobile browser)
-      if (typeof window !== "undefined" && window.ethereum) {
-        try {
+    const connectBtn = document.getElementById("connectBtn");
+    const modal = document.getElementById("modal");
+    const confirmConnect = document.getElementById("confirmConnect");
+    const cancelConnect = document.getElementById("cancelConnect");
+    const addrEl = document.getElementById("addr");
+
+    let ctx = null;
+
+    connectBtn.onclick = () => { modal.style.display = "flex"; };
+
+    cancelConnect.onclick = () => {
+      modal.style.display = "none";
+      addrEl.textContent = "-";
+      ctx = null;
+    };
+
+    confirmConnect.onclick = async () => {
+      try {
+        // Try injected first
+        if (window.ethereum) {
           await window.ethereum.request({ method: "eth_requestAccounts" });
           const provider = new ethers.BrowserProvider(window.ethereum);
           const signer = await provider.getSigner();
-          return { type: "injected", provider, signer };
-        } catch (e) {
-          console.warn("Injected connect failed, will fallback:", e);
-        }
-      }
-
-      // 2) WalletConnect modal
-      const session = await wcModal.open();
-      // Build minimal EIP-1193 request bridge for ethers
-      const wcProvider = {
-        request: async ({ method, params }) => {
-          return session.request({
-            topic: session.topic,
-            chainId: SEPOLIA_NAMESPACE,
-            request: { method, params }
-          });
-        }
-      };
-      const provider = new ethers.BrowserProvider(wcProvider);
-      const signer = await provider.getSigner();
-      return { type: "walletconnect", provider, signer, session };
-    }
-
-    async function disconnectUniversal(context) {
-      try {
-        if (context?.type === "walletconnect" && wcModal) {
-          await wcModal.close();
+          addrEl.textContent = await signer.getAddress();
+          ctx = { provider, signer };
+        } else {
+          // Fallback to WalletConnect
+          const session = await wcModal.open();
+          const wcProvider = {
+            request: async ({ method, params }) => {
+              return session.request({
+                topic: session.topic,
+                chainId: SEPOLIA,
+                request: { method, params }
+              });
+            }
+          };
+          const provider = new ethers.BrowserProvider(wcProvider);
+          const signer = await provider.getSigner();
+          addrEl.textContent = await signer.getAddress();
+          ctx = { provider, signer, session };
         }
       } catch (e) {
-        console.warn("Disconnect warning:", e);
-      }
-    }
-
-    // UI handlers
-    connectBtn.onclick = async () => {
-      try {
-        ctx = await connectUniversal();
-        const address = await ctx.signer.getAddress();
-        const network = await ctx.provider.getNetwork();
-
-        addrEl.textContent = address;
-        chainEl.textContent = String(Number(network.chainId));
-        connectorEl.textContent = ctx.type;
-
-        connectBtn.disabled = true;
-        disconnectBtn.disabled = false;
-        signBtn.disabled = false;
-        sendBtn.disabled = false;
-      } catch (e) {
-        alert("Connect failed");
+        alert("Connection failed");
         console.error(e);
       }
     };
-
-    disconnectBtn.onclick = async () => {
-      try {
-        await disconnectUniversal(ctx);
-      } finally {
-        ctx = null;
-        addrEl.textContent = "-";
-        chainEl.textContent = "-";
-        connectorEl.textContent = "-";
-        sigEl.textContent = "-";
-        txhEl.textContent = "-";
-        connectBtn.disabled = false;
-        disconnectBtn.disabled = true;
-        signBtn.disabled = true;
-        sendBtn.disabled = true;
-      }
-    };
-
-    signBtn.onclick = async () => {
-      if (!ctx) return;
-      try {
-        const msg = msgInput.value || "Hello Sepolia from Universal DApp";
-        const sig = await ctx.signer.signMessage(msg);
-        sigEl.textContent = sig;
-      } catch (e) {
-        alert("Sign failed");
-        console.error(e);
-      }
-    };
-
-    sendBtn.onclick = async () => {
-      if (!ctx) return;
-      try {
-        const to = (toInput.value || "").trim();
-        const val = (valInput.value || "0").trim();
-        if (!to || !to.startsWith("0x") || to.length !== 42) {
-          alert("Invalid recipient address"); return;
-        }
-        if (Number(val) < 0) { alert("Invalid amount"); return; }
-
-        const tx = await ctx.signer.sendTransaction({
-          to,
-          value: ethers.parseEther(val || "0")
-        });
-        const receipt = await tx.wait();
-        txhEl.textContent = receipt?.hash || tx.hash;
-      } catch (e) {
-        alert("Transaction failed");
-        console.error(e);
-      }
-    };
-
-    // Optional: warn if not on Sepolia for injected providers
-    window.addEventListener("load", async () => {
-      if (window.ethereum) {
-        try {
-          const chainIdHex = await window.ethereum.request({ method: "eth_chainId" });
-          const chainId = parseInt(chainIdHex, 16);
-          if (chainId !== SEPOLIACHAINID) {
-            console.log("You are not on Sepolia. Switch for testing if needed.");
-          }
-        } catch {}
-      }
-    });
   </script>
 </body>
 </html>
