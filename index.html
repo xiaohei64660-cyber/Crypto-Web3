@@ -1,13 +1,29 @@
-<html lang="my">
+<!DOCTYPE html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <title>Crypto Web3 Demo</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body { margin:0; height:100vh; display:flex; justify-content:center; align-items:center;
-           background:#0f111a; font-family:sans-serif; color:#fff; }
-    #connectBtn { font-size:20px; padding:14px 28px; border:none; border-radius:10px;
-                  background:#3b82f6; color:#fff; cursor:pointer; }
+    body {
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: #0f111a;
+      font-family: sans-serif;
+      color: #fff;
+    }
+    #connectBtn {
+      font-size: 20px;
+      padding: 14px 28px;
+      border: none;
+      border-radius: 10px;
+      background: #3b82f6;
+      color: #fff;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -19,12 +35,13 @@
   <script src="https://cdn.jsdelivr.net/npm/ethers@6.11.1/dist/ethers.umd.min.js"></script>
 
   <script>
-    const PROJECT_ID = "b8f109f1f1b42ea46db278b216df1daa";
-    const SEPOLIA = "eip155:11155111";
+    const PROJECT_ID = "b8f109f1f1b42ea46db278b216df1daa"; // your WalletConnect Project ID
+    const SEPOLIA = "eip155:11155111"; // Sepolia testnet chain
 
     let wcModal;
 
     window.addEventListener("load", () => {
+      // Create WalletConnect Modal object
       wcModal = new window.WalletConnectModal.WalletConnectModal({
         projectId: PROJECT_ID,
         chains: [SEPOLIA],
@@ -37,13 +54,12 @@
         }
       });
 
+      // Open modal when button is clicked
       document.getElementById("connectBtn").onclick = async () => {
         try {
-          const session = await wcModal.open();
-          const account = session.namespaces.eip155.accounts[0].split(":")[2];
-          alert("Connected: " + account);
+          await wcModal.openModal(); // show WalletConnect modal
         } catch (e) {
-          console.error(e);
+          console.error("WalletConnect error:", e);
           alert("Connection failed");
         }
       };
