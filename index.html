@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Crypto Web3 Platform</title>
+  <title>Web3 Wallet Access</title>
   <style>
     body {
       margin: 0;
@@ -11,146 +11,190 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      background: #0f0f17;
-      font-family: 'Segoe UI', sans-serif;
-      color: #e0e0ff;
+      background: #0f111a;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      color: #e0e0e0;
+      padding: 20px;
+      box-sizing: border-box;
     }
     .card {
-      background: #151828;
+      background: #161a24;
       padding: 32px;
       border-radius: 16px;
-      width: 90%;
+      width: 100%;
       max-width: 420px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
       text-align: center;
     }
     h1 {
-      font-size: 28px;
+      font-size: 26px;
       margin: 0 0 16px;
-      color: #ffffff;
+      color: #fff;
     }
-    .desc {
-      color: #a0a0cc;
+    .description {
       font-size: 15px;
       line-height: 1.5;
+      color: #aaa;
       margin-bottom: 28px;
     }
-    .btn {
+    .connect-btn {
       display: block;
       width: 100%;
       padding: 14px;
-      background: #6366f1;
+      background: #3b82f6;
       color: white;
       border: none;
-      border-radius: 12px;
+      border-radius: 10px;
       font-size: 17px;
       font-weight: 600;
       cursor: pointer;
       transition: background 0.2s;
     }
-    .btn:hover {
-      background: #4f46e5;
+    .connect-btn:hover {
+      background: #2563eb;
     }
-    .hidden { display: none; }
+    .connect-btn:active {
+      transform: scale(0.99);
+    }
+
+    /* Connected view */
+    .connected-view {
+      display: none;
+    }
     .address {
       font-family: monospace;
-      background: #0f0f1a;
+      background: #0f131b;
       padding: 12px;
-      border-radius: 10px;
+      border-radius: 8px;
       margin: 16px 0;
       font-size: 14px;
       word-break: break-all;
-      color: #d0d0ff;
+      color: #fff;
     }
     .network {
       display: inline-block;
-      background: #10b981;
+      background: #22c55e;
       color: #000;
       padding: 4px 12px;
       border-radius: 20px;
       font-size: 12px;
       font-weight: bold;
-      margin: 10px 0;
+      margin-top: 8px;
+    }
+    .disconnect-btn {
+      margin-top: 20px;
+      padding: 10px 16px;
+      background: #222;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      cursor: pointer;
     }
   </style>
 </head>
 <body>
-  <!-- Connect Screen -->
-  <div class="card" id="connectScreen">
-    <h1>Welcome to Crypto Web3</h1>
-    <p class="desc">
-      Connect your wallet to access decentralized trading, swaps, and portfolio management.
-      Fully non-custodial and secure.
-    </p>
-    <button class="btn" id="connectBtn">Connect Your Wallet</button>
+  <div class="card">
+    <!-- Initial Screen -->
+    <div id="initScreen">
+      <h1>Access Your Account</h1>
+      <p class="description">
+        Connect your crypto wallet to trade, swap, and manage digital assets securely.
+        Supported on Ethereum, Polygon, BSC, Arbitrum, Base, and more.
+      </p>
+      <button id="connectBtn" class="connect-btn">Connect Your Wallet</button>
+    </div>
+
+    <!-- Connected Screen -->
+    <div id="connectedScreen" class="connected-view">
+      <h1>Connected</h1>
+      <p>Your wallet address:</p>
+      <div class="address" id="userAddress">0x...</div>
+      <div class="network" id="networkName">—</div>
+      <button class="disconnect-btn" onclick="handleDisconnect()">Disconnect</button>
+    </div>
   </div>
 
-  <!-- Connected Screen -->
-  <div class="card hidden" id="appScreen">
-    <h1>Connected</h1>
-    <div class="address" id="address">0x...</div>
-    <div class="network" id="network">—</div>
-    <button class="btn" style="background:#ef4444;" onclick="disconnect()">Disconnect</button>
-  </div>
-
-  <!-- Ethers.js from CDN -->
+  <!-- Load Ethers.js (lightweight, no React needed) -->
   <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js"></script>
   <script>
-    const connectScreen = document.getElementById('connectScreen');
-    const appScreen = document.getElementById('appScreen');
-    const addressEl = document.getElementById('address');
-    const networkEl = document.getElementById('network');
-    const connectBtn = document.getElementById('connectBtn');
+    let provider;
+    let signer;
 
-    // Chain ID → Name
+    // DOM Elements
+    const initScreen = document.getElementById('initScreen');
+    const connectedScreen = document.getElementById('connectedScreen');
+    const connectBtn = document.getElementById('connectBtn');
+    const userAddressEl = document.getElementById('userAddress');
+    const networkNameEl = document.getElementById('networkName');
+
+    // Chain ID to name mapping (for major EVM chains)
     const chainNames = {
       1: 'Ethereum',
       137: 'Polygon',
       56: 'BSC',
       42161: 'Arbitrum',
-      8453: 'Base',
       10: 'Optimism',
+      8453: 'Base',
       43114: 'Avalanche',
-      250: 'Fantom'
+      250: 'Fantom',
+      1101: 'Polygon zkEVM'
     };
 
-    connectBtn.addEventListener('click', connect);
+    // Connect wallet on button click
+    connectBtn.addEventListener('click', connectWallet);
 
-    async function connect() {
-      if (!window.ethereum) {
-        alert('Please install MetaMask or use a wallet-enabled browser.');
+    async function connectWallet() {
+      if (typeof window.ethereum === 'undefined') {
+        alert('Please install a wallet like MetaMask or use a browser with wallet support.');
         return;
       }
 
       try {
-        // Request account access
+        // Request accounts
         const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
         const address = ethers.utils.getAddress(accounts[0]);
-        addressEl.textContent = address;
+        userAddressEl.textContent = address;
 
         // Get network
-        const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-        const networkName = chainNames[parseInt(chainId, 16)] || `Chain ${parseInt(chainId, 16)}`;
-        networkEl.textContent = networkName;
+        const networkId = await window.ethereum.request({ method: 'net_version' });
+        const networkName = chainNames[networkId] || `Chain ${networkId}`;
+        networkNameEl.textContent = networkName;
+
+        // Set provider
+        provider = new ethers.providers.Web3Provider(window.ethereum);
+        signer = provider.getSigner();
 
         // Switch views
-        connectScreen.classList.add('hidden');
-        appScreen.classList.remove('hidden');
+        initScreen.style.display = 'none';
+        connectedScreen.style.display = 'block';
 
-        // Optional: refresh on account/network change
-        window.ethereum.on('accountsChanged', () => location.reload());
-        window.ethereum.on('chainChanged', () => location.reload());
+        // Listen for account/network changes
+        window.ethereum.on('accountsChanged', (accounts) => {
+          if (accounts.length === 0) {
+            handleDisconnect();
+          } else {
+            userAddressEl.textContent = ethers.utils.getAddress(accounts[0]);
+          }
+        });
+
+        window.ethereum.on('chainChanged', () => {
+          location.reload(); // Simple reload on network switch
+        });
 
       } catch (error) {
-        console.error(error);
-        alert('Connection was rejected or failed.');
+        console.error('Connection failed:', error);
+        alert('Wallet connection was rejected or failed.');
       }
     }
 
-    function disconnect() {
-      // Clear and go back
-      connectScreen.classList.remove('hidden');
-      appScreen.classList.add('hidden');
+    function handleDisconnect() {
+      // Clear state
+      provider = null;
+      signer = null;
+      // Switch back
+      connectedScreen.style.display = 'none';
+      initScreen.style.display = 'block';
     }
   </script>
 </body>
