@@ -53,9 +53,6 @@
     .connect-btn:hover {
       background: #2563eb;
     }
-    .connect-btn:active {
-      transform: scale(0.99);
-    }
 
     /* Connected view */
     .connected-view {
@@ -71,6 +68,10 @@
       word-break: break-all;
       color: #fff;
     }
+    .balance {
+      margin: 8px 0;
+      font-size: 16px;
+    }
     .network {
       display: inline-block;
       background: #22c55e;
@@ -79,7 +80,27 @@
       border-radius: 20px;
       font-size: 12px;
       font-weight: bold;
-      margin-top: 8px;
+      margin: 8px 0;
+    }
+    .switch-buttons {
+      margin: 16px 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+    }
+    .switch-btn {
+      padding: 6px 12px;
+      background: #2a2f3a;
+      color: #aaa;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .switch-btn.active {
+      background: #3b82f6;
+      color: white;
     }
     .disconnect-btn {
       margin-top: 20px;
@@ -90,6 +111,10 @@
       border-radius: 8px;
       font-size: 15px;
       cursor: pointer;
+    }
+    .loading {
+      color: #555;
+      font-style: italic;
     }
   </style>
 </head>
@@ -107,92 +132,181 @@
 
     <!-- Connected Screen -->
     <div id="connectedScreen" class="connected-view">
-      <h1>Connected</h1>
-      <p>Your wallet address:</p>
+      <h1>Wallet Connected</h1>
       <div class="address" id="userAddress">0x...</div>
       <div class="network" id="networkName">—</div>
+
+      <div class="balance" id="ethBalance">ETH: <span class="loading">loading...</span></div>
+      <div class="balance" id="usdcBalance">USDC: <span class="loading">loading...</span></div>
+
+      <div class="switch-buttons" id="switchButtons"></div>
+
       <button class="disconnect-btn" onclick="handleDisconnect()">Disconnect</button>
     </div>
   </div>
 
-  <!-- Load Ethers.js (lightweight, no React needed) -->
+  <!-- Ethers.js -->
   <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js"></script>
   <script>
+    // Chain config (name, id, USDC contract if exists)
+    const chains = [
+      { id: 1, name: 'Ethereum', usdc: '0xA0b86a33E6441E8C1a2d9F0a9B9a9a9a9a9a9a9a9'.toLowerCase() }, // Mainnet USDC (use real if needed)
+      { id: 137, name: 'Polygon', usdc: '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174'.toLowerCase() },
+      { id: 8453, name: 'Base', usdc: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'.toLowerCase() },
+      { id: 42161, name: 'Arbitrum', usdc: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831'.toLowerCase() },
+      { id: 10, name: 'Optimism', usdc: '0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85'.toLowerCase() },
+      { id: 56, name: 'BSC', usdc: null }, // BSC uses BUSD mostly; skip USDC
+    ];
+
+    const chainMap = {};
+    chains.forEach(c => chainMap[c.id] = c);
+
     let provider;
     let signer;
+    let currentChainId;
+    let userAddress;
 
-    // DOM Elements
     const initScreen = document.getElementById('initScreen');
     const connectedScreen = document.getElementById('connectedScreen');
     const connectBtn = document.getElementById('connectBtn');
     const userAddressEl = document.getElementById('userAddress');
     const networkNameEl = document.getElementById('networkName');
+    const ethBalanceEl = document.getElementById('ethBalance');
+    const usdcBalanceEl = document.getElementById('usdcBalance');
+    const switchButtonsEl = document.getElementById('switchButtons');
 
-    // Chain ID to name mapping (for major EVM chains)
-    const chainNames = {
-      1: 'Ethereum',
-      137: 'Polygon',
-      56: 'BSC',
-      42161: 'Arbitrum',
-      10: 'Optimism',
-      8453: 'Base',
-      43114: 'Avalanche',
-      250: 'Fantom',
-      1101: 'Polygon zkEVM'
-    };
+    // ERC-20 ABI (minimal)
+    const erc20Abi = [
+      "function balanceOf(address owner) view returns (uint256)",
+      "function decimals() view returns (uint8)"
+    ];
 
-    // Connect wallet on button click
     connectBtn.addEventListener('click', connectWallet);
 
     async function connectWallet() {
-      if (typeof window.ethereum === 'undefined') {
-        alert('Please install a wallet like MetaMask or use a browser with wallet support.');
+      if (!window.ethereum) {
+        alert('Please install MetaMask or a compatible wallet.');
         return;
       }
 
       try {
-        // Request accounts
         const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-        const address = ethers.utils.getAddress(accounts[0]);
-        userAddressEl.textContent = address;
+        userAddress = ethers.utils.getAddress(accounts[0]);
+        userAddressEl.textContent = userAddress;
 
-        // Get network
-        const networkId = await window.ethereum.request({ method: 'net_version' });
-        const networkName = chainNames[networkId] || `Chain ${networkId}`;
-        networkNameEl.textContent = networkName;
+        await setupProvider();
+        renderSwitchButtons();
 
-        // Set provider
-        provider = new ethers.providers.Web3Provider(window.ethereum);
-        signer = provider.getSigner();
-
-        // Switch views
         initScreen.style.display = 'none';
         connectedScreen.style.display = 'block';
 
-        // Listen for account/network changes
-        window.ethereum.on('accountsChanged', (accounts) => {
-          if (accounts.length === 0) {
-            handleDisconnect();
-          } else {
-            userAddressEl.textContent = ethers.utils.getAddress(accounts[0]);
+        // Listen for changes
+        window.ethereum.on('accountsChanged', () => location.reload());
+        window.ethereum.on('chainChanged', () => location.reload());
+      } catch (err) {
+        console.error(err);
+        alert('Connection failed.');
+      }
+    }
+
+    async function setupProvider() {
+      provider = new ethers.providers.Web3Provider(window.ethereum);
+      signer = provider.getSigner();
+      const network = await provider.getNetwork();
+      currentChainId = network.chainId;
+
+      const chain = chainMap[currentChainId] || { name: `Chain ${currentChainId}`, usdc: null };
+      networkNameEl.textContent = chain.name;
+
+      await updateBalances(chain);
+    }
+
+    async function updateBalances(chain) {
+      // ETH/native balance
+      const ethBalance = await provider.getBalance(userAddress);
+      const ethFormatted = ethers.utils.formatEther(ethBalance);
+      ethBalanceEl.innerHTML = `ETH: ${parseFloat(ethFormatted).toFixed(4)}`;
+
+      // USDC balance
+      if (chain.usdc) {
+        try {
+          const usdcContract = new ethers.Contract(chain.usdc, erc20Abi, provider);
+          const decimals = await usdcContract.decimals();
+          const balance = await usdcContract.balanceOf(userAddress);
+          const usdcFormatted = parseFloat(ethers.utils.formatUnits(balance, decimals)).toFixed(2);
+          usdcBalanceEl.innerHTML = `USDC: ${usdcFormatted}`;
+        } catch (e) {
+          usdcBalanceEl.innerHTML = `USDC: —`;
+        }
+      } else {
+        usdcBalanceEl.innerHTML = `USDC: —`;
+      }
+    }
+
+    function renderSwitchButtons() {
+      switchButtonsEl.innerHTML = '';
+      chains.forEach(chain => {
+        const btn = document.createElement('button');
+        btn.className = 'switch-btn';
+        if (chain.id === currentChainId) {
+          btn.classList.add('active');
+        }
+        btn.textContent = `Switch to ${chain.name}`;
+        btn.onclick = () => switchNetwork(chain.id);
+        switchButtonsEl.appendChild(btn);
+      });
+    }
+
+    async function switchNetwork(chainId) {
+      if (currentChainId === chainId) return;
+
+      try {
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: '0x' + chainId.toString(16) }]
+        });
+        // Page will reload due to chainChanged listener
+      } catch (switchError) {
+        if (switchError.code === 4902) {
+          // Chain not added — prompt to add
+          const chain = chains.find(c => c.id === chainId);
+          if (!chain) return;
+
+          const chainInfo = {
+            chainId: '0x' + chainId.toString(16),
+            chainName: chain.name,
+            nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
+            rpcUrls: ['https://rpc.ankr.com/eth'], // fallback; better to use chain-specific RPC
+            blockExplorerUrls: ['https://etherscan.io']
+          };
+
+          // Use chain-specific RPCs if needed (simplified here)
+          if (chainId === 137) {
+            chainInfo.rpcUrls = ['https://polygon-rpc.com'];
+            chainInfo.nativeCurrency = { name: 'MATIC', symbol: 'MATIC', decimals: 18 };
+            chainInfo.blockExplorerUrls = ['https://polygonscan.com'];
+          } else if (chainId === 8453) {
+            chainInfo.rpcUrls = ['https://mainnet.base.org'];
+            chainInfo.blockExplorerUrls = ['https://basescan.org'];
           }
-        });
 
-        window.ethereum.on('chainChanged', () => {
-          location.reload(); // Simple reload on network switch
-        });
-
-      } catch (error) {
-        console.error('Connection failed:', error);
-        alert('Wallet connection was rejected or failed.');
+          try {
+            await window.ethereum.request({
+              method: 'wallet_addEthereumChain',
+              params: [chainInfo]
+            });
+          } catch (addError) {
+            alert('Failed to add network: ' + addError.message);
+          }
+        } else {
+          alert('Network switch failed: ' + switchError.message);
+        }
       }
     }
 
     function handleDisconnect() {
-      // Clear state
       provider = null;
       signer = null;
-      // Switch back
       connectedScreen.style.display = 'none';
       initScreen.style.display = 'block';
     }
