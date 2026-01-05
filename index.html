@@ -1,6 +1,139 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <meta charset="UTF-8">
+  <title>Crypto Platform Access</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {
+      margin:0; min-height:100vh;
+      display:flex; justify-content:center; align-items:center;
+      background:#0f111a; font-family:sans-serif; color:#fff;
+    }
+    .card {
+      background:#161a24; padding:24px; border-radius:12px;
+      width:100%; max-width:400px; box-shadow:0 8px 24px rgba(0,0,0,0.35);
+    }
+    h1 { margin-bottom:16px; }
+    .btn {
+      display:block; width:100%; padding:12px; margin-top:12px;
+      border:none; border-radius:8px; font-size:16px; cursor:pointer;
+    }
+    .primary { background:#3b82f6; color:#fff; }
+    .secondary { background:#22c55e; color:#0f111a; }
+    .disabled { background:#555; color:#999; cursor:not-allowed; }
+    label { display:block; margin-top:12px; font-size:14px; }
+    input { width:100%; padding:10px; border-radius:8px; border:1px solid #2a2f3a; background:#0f131b; color:#fff; }
+    .hidden { display:none; }
+    .captcha { margin-top:12px; display:flex; align-items:center; gap:8px; }
+  </style>
+</head>
+<body>
+  <div class="card" id="mainCard">
+    <h1>Welcome</h1>
+    <button class="btn primary" onclick="showLogin()">Login</button>
+    <button class="btn secondary" onclick="showSignup()">Signup</button>
+  </div>
+
+  <!-- Login form -->
+  <div class="card hidden" id="loginCard">
+    <h1>Login</h1>
+    <label>Email or Phone</label>
+    <input id="loginUser" type="text">
+    <label>Password</label>
+    <input id="loginPass" type="password">
+    <button class="btn primary" onclick="login()">Login</button>
+    <button class="btn secondary" onclick="back()">Back</button>
+  </div>
+
+  <!-- Signup form -->
+  <div class="card hidden" id="signupCard">
+    <h1>Signup</h1>
+    <label>Email Address or Phone Number</label>
+    <input id="signupUser" type="text">
+    <label>Password</label>
+    <input id="signupPass" type="password">
+    <label>Confirm Password</label>
+    <input id="signupConfirm" type="password">
+    <div class="captcha">
+      <input type="checkbox" id="captchaCheck">
+      <span>I'm not a robot</span>
+    </div>
+    <button id="signupBtn" class="btn disabled" disabled>Signup</button>
+    <button class="btn secondary" onclick="back()">Back</button>
+  </div>
+
+  <!-- Approval message -->
+  <div class="card hidden" id="approvalCard">
+    <h1>Please wait…</h1>
+    <p>Your signup request is pending approval.</p>
+  </div>
+
+  <script>
+    const mainCard = document.getElementById("mainCard");
+    const loginCard = document.getElementById("loginCard");
+    const signupCard = document.getElementById("signupCard");
+    const approvalCard = document.getElementById("approvalCard");
+    const signupBtn = document.getElementById("signupBtn");
+
+    function showLogin() {
+      mainCard.classList.add("hidden");
+      loginCard.classList.remove("hidden");
+    }
+    function showSignup() {
+      mainCard.classList.add("hidden");
+      signupCard.classList.remove("hidden");
+    }
+    function back() {
+      loginCard.classList.add("hidden");
+      signupCard.classList.add("hidden");
+      approvalCard.classList.add("hidden");
+      mainCard.classList.remove("hidden");
+    }
+    function login() {
+      alert("Login submitted (demo only).");
+    }
+
+    // Enable signup button only when all fields filled and captcha checked
+    const signupUser = document.getElementById("signupUser");
+    const signupPass = document.getElementById("signupPass");
+    const signupConfirm = document.getElementById("signupConfirm");
+    const captchaCheck = document.getElementById("captchaCheck");
+
+    function validateSignup() {
+      const filled = signupUser.value.trim() &&
+                     signupPass.value.trim() &&
+                     signupConfirm.value.trim() &&
+                     (signupPass.value === signupConfirm.value) &&
+                     captchaCheck.checked;
+      if (filled) {
+        signupBtn.disabled = false;
+        signupBtn.classList.remove("disabled");
+        signupBtn.classList.add("primary");
+      } else {
+        signupBtn.disabled = true;
+        signupBtn.classList.add("disabled");
+        signupBtn.classList.remove("primary");
+      }
+    }
+
+    signupUser.oninput = validateSignup;
+    signupPass.oninput = validateSignup;
+    signupConfirm.oninput = validateSignup;
+    captchaCheck.onchange = validateSignup;
+
+    signupBtn.onclick = () => {
+      signupCard.classList.add("hidden");
+      approvalCard.classList.remove("hidden");
+    };
+  </script>
+</body>
+</html>
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
   <meta charset="UTF-8" />
   <title>Crypto Web3 Trading</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
