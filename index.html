@@ -1,131 +1,185 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Crypto Platform Access</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Web3 Wallet Browser</title>
   <style>
     body {
-      margin:0; min-height:100vh;
-      display:flex; justify-content:center; align-items:center;
-      background:#0f111a; font-family:sans-serif; color:#fff;
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: #0f111a;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      color: #fff;
     }
     .card {
-      background:#161a24; padding:24px; border-radius:12px;
-      width:100%; max-width:400px; box-shadow:0 8px 24px rgba(0,0,0,0.35);
+      background: #161a24;
+      padding: 24px;
+      border-radius: 16px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+      text-align: center;
     }
-    h1 { margin-bottom:16px; }
-    .btn {
-      display:block; width:100%; padding:12px; margin-top:12px;
-      border:none; border-radius:8px; font-size:16px; cursor:pointer;
+    h1 {
+      margin: 0 0 16px;
+      font-size: 24px;
     }
-    .primary { background:#3b82f6; color:#fff; }
-    .secondary { background:#22c55e; color:#0f111a; }
-    .disabled { background:#555; color:#999; cursor:not-allowed; }
-    label { display:block; margin-top:12px; font-size:14px; }
-    input { width:100%; padding:10px; border-radius:8px; border:1px solid #2a2f3a; background:#0f131b; color:#fff; }
-    .hidden { display:none; }
-    .captcha { margin-top:12px; display:flex; align-items:center; gap:8px; }
+    .info {
+      margin: 16px 0;
+      font-size: 14px;
+      color: #aaa;
+    }
+    .address {
+      background: #0f131b;
+      padding: 10px;
+      border-radius: 8px;
+      font-family: monospace;
+      font-size: 14px;
+      word-break: break-all;
+      margin: 12px 0;
+    }
+    .network {
+      display: inline-block;
+      background: #22c55e;
+      color: #000;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-top: 8px;
+    }
+    button {
+      margin-top: 12px;
+      padding: 10px 16px;
+      font-size: 16px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      background: #3b82f6;
+      color: white;
+      font-weight: 600;
+    }
+    button.secondary {
+      background: #222;
+      color: #fff;
+    }
+    .hidden { display: none; }
   </style>
 </head>
 <body>
-  <div class="card" id="mainCard">
-    <h1>Welcome</h1>
-    <button class="btn primary" onclick="showLogin()">Login</button>
-    <button class="btn secondary" onclick="showSignup()">Signup</button>
+  <!-- Connect Screen -->
+  <div class="card" id="connectScreen">
+    <h1>Connect Your Wallet</h1>
+    <p>Trade, swap, and manage assets across global blockchains.</p>
+    <div id="rk-root"></div> <!-- RainbowKit will inject here -->
   </div>
 
-  <!-- Login form -->
-  <div class="card hidden" id="loginCard">
-    <h1>Login</h1>
-    <label>Email or Phone</label>
-    <input id="loginUser" type="text">
-    <label>Password</label>
-    <input id="loginPass" type="password">
-    <button class="btn primary" onclick="login()">Login</button>
-    <button class="btn secondary" onclick="back()">Back</button>
+  <!-- Connected Screen -->
+  <div class="card hidden" id="appScreen">
+    <h1>Wallet Connected</h1>
+    <div class="info">Your address:</div>
+    <div class="address" id="userAddress">0x...</div>
+    <div class="network" id="networkName">Ethereum</div>
+    <button class="secondary" onclick="disconnect()">Disconnect</button>
   </div>
 
-  <!-- Signup form -->
-  <div class="card hidden" id="signupCard">
-    <h1>Signup</h1>
-    <label>Email Address or Phone Number</label>
-    <input id="signupUser" type="text">
-    <label>Password</label>
-    <input id="signupPass" type="password">
-    <label>Confirm Password</label>
-    <input id="signupConfirm" type="password">
-    <div class="captcha">
-      <input type="checkbox" id="captchaCheck">
-      <span>I'm not a robot</span>
-    </div>
-    <button id="signupBtn" class="btn disabled" disabled>Signup</button>
-    <button class="btn secondary" onclick="back()">Back</button>
-  </div>
+  <!-- Load React, ReactDOM, Wagmi, RainbowKit from CDN -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@tanstack/query-core@latest/lib/index.umd.js"></script>
+  <script src="https://unpkg.com/@wagmi/core@latest/lib/index.umd.js"></script>
+  <script src="https://unpkg.com/wagmi@latest/lib/index.umd.js"></script>
+  <script src="https://unpkg.com/@rainbow-me/rainbowkit@latest/lib/index.umd.js"></script>
 
-  <!-- Approval message -->
-  <div class="card hidden" id="approvalCard">
-    <h1>Please wait…</h1>
-    <p>Your signup request is pending approval.</p>
-  </div>
+  <script type="module">
+    // Import required modules (via global objects from CDN)
+    const { createConfig, http, WagmiProvider, useAccount, useDisconnect, useSwitchChain } = wagmi;
+    const { mainnet, polygon, arbitrum, optimism, base, bsc } = wagmi.chains;
+    const { rainbowKitTheme, connectorsForWallets, getDefaultWallets, RainbowKitProvider } = RainbowKit;
 
-  <script>
-    const mainCard = document.getElementById("mainCard");
-    const loginCard = document.getElementById("loginCard");
-    const signupCard = document.getElementById("signupCard");
-    const approvalCard = document.getElementById("approvalCard");
-    const signupBtn = document.getElementById("signupBtn");
+    // Supported chains (global EVM networks)
+    const supportedChains = [mainnet, polygon, arbitrum, optimism, base, bsc];
 
-    function showLogin() {
-      mainCard.classList.add("hidden");
-      loginCard.classList.remove("hidden");
-    }
-    function showSignup() {
-      mainCard.classList.add("hidden");
-      signupCard.classList.remove("hidden");
-    }
-    function back() {
-      loginCard.classList.add("hidden");
-      signupCard.classList.add("hidden");
-      approvalCard.classList.add("hidden");
-      mainCard.classList.remove("hidden");
-    }
-    function login() {
-      alert("Login submitted (demo only).");
-    }
+    // Get default wallets (MetaMask, Coinbase, etc.)
+    const { wallets } = getDefaultWallets({
+      appName: 'My Crypto Platform',
+      projectId: 'YOUR_WALLETCONNECT_PROJECT_ID', // 👈 Get from https://cloud.walletconnect.com
+    });
 
-    // Enable signup button only when all fields filled and captcha checked
-    const signupUser = document.getElementById("signupUser");
-    const signupPass = document.getElementById("signupPass");
-    const signupConfirm = document.getElementById("signupConfirm");
-    const captchaCheck = document.getElementById("captchaCheck");
+    // Build connectors
+    const connectors = connectorsForWallets(wallets, {
+      appName: 'My Crypto Platform',
+      projectId: 'YOUR_WALLETCONNECT_PROJECT_ID',
+    });
 
-    function validateSignup() {
-      const filled = signupUser.value.trim() &&
-                     signupPass.value.trim() &&
-                     signupConfirm.value.trim() &&
-                     (signupPass.value === signupConfirm.value) &&
-                     captchaCheck.checked;
-      if (filled) {
-        signupBtn.disabled = false;
-        signupBtn.classList.remove("disabled");
-        signupBtn.classList.add("primary");
-      } else {
-        signupBtn.disabled = true;
-        signupBtn.classList.add("disabled");
-        signupBtn.classList.remove("primary");
+    // Create wagmi config
+    const config = createConfig({
+      connectors,
+      chains: supportedChains,
+      transports: supportedChains.reduce((acc, chain) => {
+        acc[chain.id] = http();
+        return acc;
+      }, {}),
+    });
+
+    // React Components
+    function ConnectSection() {
+      const { address, isConnected, chain } = useAccount();
+      const { disconnect } = useDisconnect();
+      const { switchChain } = useSwitchChain();
+
+      if (isConnected && address && chain) {
+        window.updateUI(address, chain.name);
+        return null;
       }
+
+      return React.createElement(RainbowKit.RainbowKitAuthenticationProvider, { credentials: null },
+        React.createElement(RainbowKit.ConnectButton, {
+          showBalance: false,
+          chainStatus: 'name',
+          modalSize: 'compact',
+        })
+      );
     }
 
-    signupUser.oninput = validateSignup;
-    signupPass.oninput = validateSignup;
-    signupConfirm.oninput = validateSignup;
-    captchaCheck.onchange = validateSignup;
+    function App() {
+      return React.createElement(WagmiProvider, { config: config },
+        React.createElement(RainbowKitProvider, { theme: rainbowKitTheme() },
+          React.createElement(ConnectSection)
+        )
+      );
+    }
 
-    signupBtn.onclick = () => {
-      signupCard.classList.add("hidden");
-      approvalCard.classList.remove("hidden");
+    // Render RainbowKit connect button
+    const root = ReactDOM.createRoot(document.getElementById('rk-root'));
+    root.render(React.createElement(App));
+
+    // Expose UI update to global scope
+    window.updateUI = (address, chainName) => {
+      document.getElementById('connectScreen').classList.add('hidden');
+      document.getElementById('appScreen').classList.remove('hidden');
+      document.getElementById('userAddress').innerText = address;
+      document.getElementById('networkName').innerText = chainName;
+    };
+
+    window.disconnect = () => {
+      const { disconnect } = wagmi.useDisconnect();
+      disconnect();
+      document.getElementById('appScreen').classList.add('hidden');
+      document.getElementById('connectScreen').classList.remove('hidden');
     };
   </script>
+
+  <!-- ⚠️ REPLACE THIS WITH YOUR OWN WALLETCONNECT PROJECT ID -->
+  <script>
+    // Temporary fallback to avoid errors (you MUST get a real Project ID)
+    if (!window.walletConnectProjectId) {
+      console.warn('⚠️ Replace YOUR_WALLETCONNECT_PROJECT_ID with a real one from https://cloud.walletconnect.com');
+    }
+  </script>
 </body>
-</html>
+                          </html>
