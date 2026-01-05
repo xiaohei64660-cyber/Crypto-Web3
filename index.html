@@ -41,21 +41,20 @@
       <button class="connect" id="confirmConnect">Connect</button>
       <button class="cancel" id="cancelConnect">Cancel</button>
       <p><strong>Address:</strong> <span id="addr" class="mono">-</span></p>
-      <p><strong>Explorer:</strong> <a id="explorerLink" href="#" target="_blank">-</a></p>
     </div>
   </div>
 
-  <!<script src="https://cdn.jsdelivr.net/npm/@walletconnect/modal@2.6.1/dist/index.umd.min.js"></script>-- WalletConnect Modal UMD -->
-  <script src="https://unpkg.com/@walletconnect/modal/dist/index.umd.js"></script>
-  <!-- Ethers v6 UMD -->
+  <!-- Load WalletConnect Modal UMD (jsDelivr CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/@walletconnect/modal@2.6.1/dist/index.umd.min.js"></script>
+  <!-- Load Ethers v6 UMD -->
   <script src="https://cdn.jsdelivr.net/npm/ethers@6.11.1/dist/ethers.umd.min.js"></script>
 
   <script>
     const PROJECT_ID = "b8f109f1f1b42ea46db278b216df1daa";
     const SEPOLIACHAINID = 11155111;
     const SEPOLIANAMESPACE = "eip155:" + SEPOLIACHAIN_ID;
-    const EXPLORER_BASE = "https://sepolia.etherscan.io/address/";
 
+    // Create WalletConnect modal instance
     const wcModal = new window.WalletConnectModal.WalletConnectModal({
       projectId: PROJECT_ID,
       chains: [SEPOLIA_NAMESPACE],
@@ -73,7 +72,6 @@
     const confirmConnect = document.getElementById("confirmConnect");
     const cancelConnect = document.getElementById("cancelConnect");
     const addrEl = document.getElementById("addr");
-    const explorerLink = document.getElementById("explorerLink");
 
     let ctx = null;
 
@@ -84,8 +82,6 @@
     cancelConnect.onclick = () => {
       modal.style.display = "none";
       addrEl.textContent = "-";
-      explorerLink.textContent = "-";
-      explorerLink.href = "#";
       ctx = null;
     };
 
@@ -96,10 +92,7 @@
           await window.ethereum.request({ method: "eth_requestAccounts" });
           const provider = new ethers.BrowserProvider(window.ethereum);
           const signer = await provider.getSigner();
-          const address = await signer.getAddress();
-          addrEl.textContent = address;
-          explorerLink.textContent = "View on Etherscan";
-          explorerLink.href = EXPLORER_BASE + address;
+          addrEl.textContent = await signer.getAddress();
           ctx = { provider, signer };
         } else {
           const session = await wcModal.open();
@@ -114,10 +107,7 @@
           };
           const provider = new ethers.BrowserProvider(wcProvider);
           const signer = await provider.getSigner();
-          const address = await signer.getAddress();
-          addrEl.textContent = address;
-          explorerLink.textContent = "View on Etherscan";
-          explorerLink.href = EXPLORER_BASE + address;
+          addrEl.textContent = await signer.getAddress();
           ctx = { provider, signer, session };
         }
       } catch (e) {
@@ -127,3 +117,4 @@
     };
   </script>
 </body>
+</html>
