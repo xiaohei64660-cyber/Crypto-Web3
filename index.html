@@ -1,120 +1,54 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="my">
 <head>
   <meta charset="UTF-8">
-  <title>Connect Wallet Demo</title>
+  <title>Crypto Web3 Demo</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body {
-      margin:0; height:100vh;
-      display:flex; justify-content:center; align-items:center;
-      background:#0f111a; font-family:sans-serif; color:#fff;
-    }
-    #connectBtn {
-      font-size:20px; padding:14px 28px;
-      border:none; border-radius:10px;
-      background:#3b82f6; color:#fff; cursor:pointer;
-    }
-    #modal {
-      position:fixed; top:0; left:0; width:100%; height:100%;
-      background:rgba(0,0,0,0.7);
-      display:none; justify-content:center; align-items:center;
-    }
-    .modal-content {
-      background:#1a1f2b; padding:20px; border-radius:12px; text-align:center;
-    }
-    .modal-content button {
-      margin:10px; padding:10px 20px; font-size:16px;
-      border:none; border-radius:8px; cursor:pointer;
-    }
-    .connect { background:#22c55e; color:#fff; }
-    .cancel { background:#ef4444; color:#fff; }
-    .mono { font-family:monospace; word-break:break-all; }
+    body { margin:0; height:100vh; display:flex; justify-content:center; align-items:center;
+           background:#0f111a; font-family:sans-serif; color:#fff; }
+    #connectBtn { font-size:20px; padding:14px 28px; border:none; border-radius:10px;
+                  background:#3b82f6; color:#fff; cursor:pointer; }
   </style>
 </head>
 <body>
   <button id="connectBtn">Connect Wallet</button>
 
-  <div id="modal">
-    <div class="modal-content">
-      <h2>Connect your wallet</h2>
-      <button class="connect" id="confirmConnect">Connect</button>
-      <button class="cancel" id="cancelConnect">Cancel</button>
-      <p><strong>Address:</strong> <span id="addr" class="mono">-</span></p>
-    </div>
-  </div>
-
-  <!-- Load WalletConnect Modal UMD (jsDelivr CDN) -->
+  <!-- WalletConnect Modal UMD -->
   <script src="https://cdn.jsdelivr.net/npm/@walletconnect/modal@2.6.1/dist/index.umd.min.js"></script>
-  <!-- Load Ethers v6 UMD -->
+  <!-- Ethers v6 UMD -->
   <script src="https://cdn.jsdelivr.net/npm/ethers@6.11.1/dist/ethers.umd.min.js"></script>
 
   <script>
     const PROJECT_ID = "b8f109f1f1b42ea46db278b216df1daa";
-    const SEPOLIACHAINID = 11155111;
-    const SEPOLIANAMESPACE = "eip155:" + SEPOLIACHAIN_ID;
+    const SEPOLIA = "eip155:11155111";
 
-    // Create WalletConnect modal instance
-    const wcModal = new window.WalletConnectModal.WalletConnectModal({
-      projectId: PROJECT_ID,
-      chains: [SEPOLIA_NAMESPACE],
-      themeMode: "dark",
-      metadata: {
-        name: "Connect Wallet Demo",
-        description: "Simple landing page demo",
-        url: "https://example.com",
-        icons: ["https://assets.trustwallet.com/blockchains/ethereum/info/logo.png"]
-      }
-    });
+    let wcModal;
 
-    const connectBtn = document.getElementById("connectBtn");
-    const modal = document.getElementById("modal");
-    const confirmConnect = document.getElementById("confirmConnect");
-    const cancelConnect = document.getElementById("cancelConnect");
-    const addrEl = document.getElementById("addr");
-
-    let ctx = null;
-
-    // Show modal when main button clicked
-    connectBtn.onclick = () => { modal.style.display = "flex"; };
-
-    // Cancel closes modal
-    cancelConnect.onclick = () => {
-      modal.style.display = "none";
-      addrEl.textContent = "-";
-      ctx = null;
-    };
-
-    // Connect triggers wallet connection
-    confirmConnect.onclick = async () => {
-      try {
-        if (window.ethereum) {
-          await window.ethereum.request({ method: "eth_requestAccounts" });
-          const provider = new ethers.BrowserProvider(window.ethereum);
-          const signer = await provider.getSigner();
-          addrEl.textContent = await signer.getAddress();
-          ctx = { provider, signer };
-        } else {
-          const session = await wcModal.open();
-          const wcProvider = {
-            request: async ({ method, params }) => {
-              return session.request({
-                topic: session.topic,
-                chainId: SEPOLIA_NAMESPACE,
-                request: { method, params }
-              });
-            }
-          };
-          const provider = new ethers.BrowserProvider(wcProvider);
-          const signer = await provider.getSigner();
-          addrEl.textContent = await signer.getAddress();
-          ctx = { provider, signer, session };
+    window.addEventListener("load", () => {
+      wcModal = new window.WalletConnectModal.WalletConnectModal({
+        projectId: PROJECT_ID,
+        chains: [SEPOLIA],
+        themeMode: "dark",
+        metadata: {
+          name: "Crypto Web3 Demo",
+          description: "Sepolia testnet demo",
+          url: "https://xiaohei64660-cyber.github.io/Crypto-Web3/",
+          icons: ["https://assets.trustwallet.com/blockchains/ethereum/info/logo.png"]
         }
-      } catch (e) {
-        alert("Connection failed");
-        console.error(e);
-      }
-    };
+      });
+
+      document.getElementById("connectBtn").onclick = async () => {
+        try {
+          const session = await wcModal.open();
+          const account = session.namespaces.eip155.accounts[0].split(":")[2];
+          alert("Connected: " + account);
+        } catch (e) {
+          console.error(e);
+          alert("Connection failed");
+        }
+      };
+    });
   </script>
 </body>
 </html>
